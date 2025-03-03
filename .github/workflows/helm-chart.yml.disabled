@@ -1,14 +1,10 @@
+# This workflow has been replaced by release-pipeline.yml
+# Keeping for reference
+
 name: Build, Test & Publish Helm Chart
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  release:
-    types: [published]
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   lint:

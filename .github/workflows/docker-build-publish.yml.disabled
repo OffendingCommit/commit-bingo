@@ -1,12 +1,10 @@
+# This workflow has been replaced by release-pipeline.yml
+# Keeping for reference
+
 name: Build and Publish Docker Image
 
 on:
-  push:
-    branches: 
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   build:
