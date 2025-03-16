@@ -47,14 +47,18 @@ def build_closed_message(parent: ui.element) -> None:
                     f"font-family: {HEADER_FONT_FAMILY}; color: {CLOSED_MESSAGE_COLOR}; font-size: 6rem;"
                 )
 
-    # Run JavaScript to ensure text is resized properly
+    # Trigger the cached size application or fitty logic for this element
     try:
         js_code = """
-            setTimeout(function() {
-                if (typeof fitty !== 'undefined') {
-                    fitty('.fit-header', { multiLine: true, minSize: 10, maxSize: 2000 });
+            // Apply cached sizes if available, or mark for fitty
+            if (typeof applyCachedSizes === 'function') {
+                applyCachedSizes();
+                
+                // Force immediate applyFitty for this important element
+                if (typeof applyFitty === 'function') {
+                    applyFitty(true); // force parameter
                 }
-            }, 50);
+            }
         """
         ui.run_javascript(js_code)
     except Exception as e:

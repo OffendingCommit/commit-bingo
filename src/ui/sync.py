@@ -17,12 +17,16 @@ def sync_board_state():
     Also handles the game closed state to ensure consistency across views.
     """
     try:
+        # Import these directly to ensure we're using the most current reference
+        from src.core.game_logic import header_label as current_header_label
+        from src.core.game_logic import is_game_closed as current_is_closed
+        
         # If game is closed, make sure all views reflect that
-        if is_game_closed:
+        if current_is_closed:
             # Update header if available
-            if header_label:
-                header_label.set_text(CLOSED_HEADER_TEXT)
-                header_label.update()
+            if current_header_label:
+                current_header_label.set_text(CLOSED_HEADER_TEXT)
+                current_header_label.update()
 
             # Show closed message in all board views
             from src.ui.board_builder import build_closed_message
@@ -33,17 +37,16 @@ def sync_board_state():
                 container.update()
 
             # Make sure controls row is showing only the Start New Game button
-            from src.core.game_logic import controls_row, reopen_game
+            from src.core.game_logic import controls_row as current_controls_row, reopen_game
 
-            if controls_row:
-
-                # Check if controls row has been already updated
-                if (
-                    controls_row.default_slot
-                    and len(controls_row.default_slot.children) != 1
-                ):
-                    controls_row.clear()
-                    with controls_row:
+            if current_controls_row:
+                # Only update controls if it's not already showing just the New Game button
+                if (not hasattr(current_controls_row, 'default_slot') or 
+                    not current_controls_row.default_slot or 
+                    len(current_controls_row.default_slot.children) != 1):
+                    
+                    current_controls_row.clear()
+                    with current_controls_row:
                         with ui.button(
                             "Start New Game", icon="autorenew", on_click=reopen_game
                         ).classes("px-4 py-2") as new_game_btn:
@@ -52,25 +55,28 @@ def sync_board_state():
             return
         else:
             # Ensure header text is correct when game is open
-            if header_label and header_label.text != HEADER_TEXT:
-                header_label.set_text(HEADER_TEXT)
-                header_label.update()
+            if current_header_label and current_header_label.text != HEADER_TEXT:
+                current_header_label.set_text(HEADER_TEXT)
+                current_header_label.update()
 
         # Normal update if game is not closed
         # Update tile styles in every board view (e.g., home and stream)
         for view_key, (container, tile_buttons_local) in board_views.items():
             update_tile_styles(tile_buttons_local)
 
-        # Safely run JavaScript to resize text
+        # Apply cached sizes whenever possible, or trigger fitty for new elements
+        # This helps reduce flickering from too many fitty calculations
         try:
-            # Add a slight delay to ensure DOM updates have propagated
             js_code = """
-                setTimeout(function() {
-                    if (typeof fitty !== 'undefined') {
-                        fitty('.fit-text', { multiLine: true, minSize: 10, maxSize: 1000 });
-                        fitty('.fit-text-small', { multiLine: true, minSize: 10, maxSize: 72 });
+                // Try to use cached sizes first
+                if (typeof applyCachedSizes === 'function') {
+                    const needsFitty = applyCachedSizes();
+                    
+                    // Only trigger fitty if we have elements that need calculation
+                    if (needsFitty && typeof resetFittyTimer === 'function') {
+                        resetFittyTimer();
                     }
-                }, 50);
+                }
             """
             ui.run_javascript(js_code)
         except Exception as e:

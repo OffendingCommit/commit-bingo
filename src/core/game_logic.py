@@ -63,8 +63,15 @@ def generate_board(seed_val: int, phrases: List[str]) -> BoardType:
     """
     global board, today_seed, clicked_tiles
 
-    todays_seed = datetime.date.today().strftime("%Y%m%d")
-    random.seed(seed_val)
+    # Always use a new seed value based on current time and the provided seed value for more randomness
+    current_date = datetime.date.today()
+    todays_seed_prefix = current_date.strftime("%Y%m%d")
+    
+    # Create a more unique seed value that combines date and time
+    current_time_ms = int((datetime.datetime.now().timestamp() % 1) * 1000)  # milliseconds part of current time
+    final_seed = seed_val * 1000 + current_time_ms  # combine with provided seed value
+    
+    random.seed(final_seed)  # Set the random seed
 
     shuffled_phrases = random.sample(phrases, 24)
     shuffled_phrases.insert(12, FREE_SPACE_TEXT)
@@ -77,7 +84,13 @@ def generate_board(seed_val: int, phrases: List[str]) -> BoardType:
             if phrase.upper() == FREE_SPACE_TEXT:
                 clicked_tiles.add((r, c))
 
-    today_seed = f"{todays_seed}.{seed_val}"
+    # Format the seed string for display using the provided seed value (board iteration)
+    today_seed = f"{todays_seed_prefix}.{seed_val}"
+
+    # Update the seed label if available
+    if seed_label is not None:
+        seed_label.set_text(f"Seed: {today_seed}")
+        seed_label.update()
 
     return board
 
@@ -286,6 +299,8 @@ def generate_new_board(phrases: List[str]) -> None:
         phrases: List of phrases to use for the board
     """
     global board_iteration
+    global is_game_closed, header_label
+    is_game_closed = False
     board_iteration += 1
     generate_board(board_iteration, phrases)
 
@@ -298,11 +313,7 @@ def generate_new_board(phrases: List[str]) -> None:
         build_board(container, tile_buttons_local, toggle_tile, board, clicked_tiles)
         container.update()
 
-    # Update the seed label if available
-    if seed_label is not None:
-        seed_label.set_text(f"Seed: {today_seed}")
-        seed_label.update()
-
+    # Reset any clicked tiles except for the FREE SPACE
     reset_board()
 
 
@@ -364,7 +375,7 @@ def reopen_game() -> None:
         header_label.set_text(HEADER_TEXT)
         header_label.update()
 
-    # Generate a new board
+    # Generate a new board with increased board_iteration for different seed
     from src.utils.file_operations import read_phrases_file
 
     phrases: List[str] = read_phrases_file()

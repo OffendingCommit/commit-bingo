@@ -49,8 +49,8 @@ def home_page():
     
     try:
         # Create a timer that deactivates when the client disconnects
-        # Use a faster timer (0.05 seconds) to ensure quick synchronization
-        timer = ui.timer(0.05, sync_board_state)
+        # Using 0.1 seconds gives good responsiveness while avoiding UI flicker
+        timer = ui.timer(0.1, sync_board_state)
         
         # Handle disconnection
         def on_disconnect():
@@ -83,8 +83,8 @@ def stream_page():
     
     try:
         # Create a timer that deactivates when the client disconnects
-        # Use a faster timer (0.05 seconds) to ensure quick synchronization
-        timer = ui.timer(0.05, sync_board_state)
+        # Using 0.1 seconds gives good responsiveness while avoiding UI flicker
+        timer = ui.timer(0.1, sync_board_state)
         
         # Handle disconnection
         def on_disconnect():

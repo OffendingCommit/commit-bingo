@@ -20,7 +20,7 @@ CLOSED_MESSAGE_COLOR: Final[CssColor] = "#FF7f33"
 
 # Free space settings
 FREE_SPACE_TEXT: Final[str] = "FREE MEAT"
-FREE_SPACE_TEXT_COLOR: Final[CssColor] = "#FF7f33"
+FREE_SPACE_TEXT_COLOR: Final[CssColor] = "#1BEFF5"
 
 # Tile appearance settings
 TILE_CLICKED_BG_COLOR: Final[CssColor] = "#100079"

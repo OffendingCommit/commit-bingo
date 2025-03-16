@@ -106,23 +106,172 @@ def setup_head(background_color: str):
     # Set background color
     ui.add_head_html(f"<style>body {{ background-color: {background_color}; }}</style>")
 
-    # Add event listeners for fitty
+    # Add event listeners for fitty with caching and efficient reapplication
     ui.add_head_html(
         """<script>
+        // Cache for storing computed font sizes
+        window.fittySizeCache = {};
+        
+        // Track window dimensions to know when recalculation is needed
+        let lastWindowWidth = window.innerWidth;
+        let lastWindowHeight = window.innerHeight;
+        
+        // Track when the last fitty application was performed to avoid rapid changes
+        let lastFittyApplication = 0;
+        let fittyTimer;
+        
+        // Allow external code to reset/trigger the fitty timer
+        window.resetFittyTimer = function() {
+            clearTimeout(fittyTimer);
+            // Wait a bit longer to ensure fewer, better-timed fitty calls
+            fittyTimer = setTimeout(applyFitty, 150);
+        };
+        
+        // Store computed size in cache
+        function cacheFittySize(element, size) {
+            const id = element.getAttribute('id') || 
+                       element.getAttribute('data-fitty-id') || 
+                       Math.random().toString(36).substring(2, 10);
+                       
+            // Ensure the element has an ID for cache lookup
+            if (!element.getAttribute('data-fitty-id')) {
+                element.setAttribute('data-fitty-id', id);
+            }
+            
+            // Store the size
+            window.fittySizeCache[id] = {
+                size: size,
+                windowWidth: lastWindowWidth,
+                windowHeight: lastWindowHeight,
+                content: element.textContent,
+                className: element.className
+            };
+        }
+        
+        // Try to retrieve cached size
+        function getCachedSize(element) {
+            const id = element.getAttribute('id') || element.getAttribute('data-fitty-id');
+            if (!id || !window.fittySizeCache[id]) return null;
+            
+            const cache = window.fittySizeCache[id];
+            
+            // Only use cache if window size and content haven't changed
+            if (cache.windowWidth === lastWindowWidth && 
+                cache.windowHeight === lastWindowHeight &&
+                cache.content === element.textContent &&
+                cache.className === element.className) {
+                return cache.size;
+            }
+            
+            return null;
+        }
+        
+        // Apply cached sizes if available, otherwise use fitty
+        function applyCachedSizes() {
+            const elements = document.querySelectorAll('.fit-text, .fit-text-small, .fit-header');
+            let needsFitty = false;
+            
+            elements.forEach(function(el) {
+                const cachedSize = getCachedSize(el);
+                if (cachedSize !== null) {
+                    // Apply cached size directly
+                    el.style.fontSize = cachedSize + 'px';
+                    el.setAttribute('data-fitty-applied', 'cached');
+                } else {
+                    // Mark for fitty processing
+                    el.setAttribute('data-fitty-applied', 'pending');
+                    needsFitty = true;
+                }
+            });
+            
+            return needsFitty;
+        }
+        
         // Run fitty when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(applyFitty, 100);  // Slight delay to ensure all elements are rendered
+            // Update window dimensions
+            lastWindowWidth = window.innerWidth;
+            lastWindowHeight = window.innerHeight;
+            
+            // First try cached sizes
+            const needsFitty = applyCachedSizes();
+            
+            // Only run fitty if necessary
+            if (needsFitty) {
+                setTimeout(applyFitty, 150);
+            }
         });
         
         // Run fitty when window is resized
         let resizeTimer;
         window.addEventListener('resize', function() {
+            // Update window dimensions
+            lastWindowWidth = window.innerWidth;
+            lastWindowHeight = window.innerHeight;
+            
             clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(applyFitty, 100);  // Debounce resize events
+            resizeTimer = setTimeout(applyFitty, 150);  // Debounce resize events
         });
         
-        // Periodically check and reapply fitty for any dynamic changes
-        setInterval(applyFitty, 1000);
+        // Intercept fitty to capture sizes
+        const originalFitty = window.fitty;
+        window.fitty = function(selector, options) {
+            if (typeof originalFitty !== 'function') return null;
+            
+            // Call the original fitty
+            const fittyInstances = originalFitty(selector, options);
+            
+            // Capture the computed sizes after fitty completes
+            if (Array.isArray(fittyInstances)) {
+                fittyInstances.forEach(function(instance) {
+                    instance.element.addEventListener('fit', function(e) {
+                        // Store the computed font size in our cache
+                        cacheFittySize(instance.element, e.detail.newValue);
+                    });
+                });
+            }
+            
+            return fittyInstances;
+        };
+        
+        // Improved applyFitty function with caching
+        window.applyFitty = function(force = false) {
+            // Update window dimensions
+            lastWindowWidth = window.innerWidth;
+            lastWindowHeight = window.innerHeight;
+            
+            // Don't run fitty more often than every 300ms to avoid flickering
+            const now = Date.now();
+            if (!force && now - lastFittyApplication < 300) {
+                // Schedule for later instead
+                window.resetFittyTimer();
+                return;
+            }
+            
+            // First try to apply cached sizes
+            const needsFitty = applyCachedSizes();
+            
+            // Only run fitty if we have elements that couldn't use cached values
+            if (needsFitty && typeof originalFitty === 'function') {
+                // Apply fitty only to elements that need it
+                fitty('.fit-text[data-fitty-applied="pending"]', { multiLine: true, minSize: 10, maxSize: 1000 });
+                fitty('.fit-text-small[data-fitty-applied="pending"]', { multiLine: true, minSize: 10, maxSize: 72 });
+                fitty('.fit-header[data-fitty-applied="pending"]', { multiLine: true, minSize: 10, maxSize: 2000 });
+                
+                lastFittyApplication = now;
+            }
+        };
+        
+        // Periodically check for new elements that need fitty, but less frequently
+        setInterval(function() {
+            // First try cached sizes for any new elements
+            const needsFitty = applyCachedSizes();
+            
+            // Only run fitty if we found elements that need it
+            if (needsFitty) {
+                applyFitty();
+            }
+        }, 2000);
     </script>"""
     )
 
